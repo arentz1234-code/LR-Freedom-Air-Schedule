@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { MAINTENANCE_COLOR } from '@/lib/db';
 
@@ -28,6 +28,13 @@ interface CalendarViewProps {
   isAdmin: boolean;
 }
 
+interface SlotKey {
+  dayIndex: number;
+  hour: number;
+}
+
+const HOURS = Array.from({ length: 15 }, (_, i) => i + 6); // 6 AM to 8 PM
+
 export default function CalendarView({
   bookings,
   maintenance,
@@ -37,13 +44,15 @@ export default function CalendarView({
   const router = useRouter();
   const [weekOffset, setWeekOffset] = useState(0);
   const [showModal, setShowModal] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [bookingNotes, setBookingNotes] = useState('');
-  const [bookingDays, setBookingDays] = useState(1);
-  const [bookingHours, setBookingHours] = useState(2);
-  const [startHour, setStartHour] = useState(8);
   const [loading, setLoading] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+
+  // Drag selection state
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<SlotKey | null>(null);
+  const [dragEnd, setDragEnd] = useState<SlotKey | null>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
 
   // Get week dates
   const getWeekDates = () => {
@@ -65,9 +74,9 @@ export default function CalendarView({
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const isToday = date.toDateString() === new Date().toDateString();
     return (
-      <div className={`text-center p-2 ${isToday ? 'bg-sky-100 rounded-lg' : ''}`}>
-        <div className="text-xs text-gray-500">{dayNames[date.getDay()]}</div>
-        <div className={`text-lg font-semibold ${isToday ? 'text-sky-600' : ''}`}>{date.getDate()}</div>
+      <div className={`text-center py-2 ${isToday ? 'bg-sky-500 text-white rounded-lg' : ''}`}>
+        <div className={`text-xs ${isToday ? 'text-sky-100' : 'text-gray-500'}`}>{dayNames[date.getDay()]}</div>
+        <div className={`text-lg font-semibold`}>{date.getDate()}</div>
       </div>
     );
   };
@@ -75,72 +84,139 @@ export default function CalendarView({
   const formatHour = (hour: number) => {
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-    return `${displayHour}:00 ${ampm}`;
+    return `${displayHour} ${ampm}`;
   };
 
-  const getBookingsForDay = (date: Date) => {
-    const dayStart = new Date(date);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(date);
-    dayEnd.setHours(23, 59, 59, 999);
+  const getBookingsForSlot = (date: Date, hour: number) => {
+    const slotStart = new Date(date);
+    slotStart.setHours(hour, 0, 0, 0);
+    const slotEnd = new Date(date);
+    slotEnd.setHours(hour + 1, 0, 0, 0);
 
     return bookings.filter((b) => {
       const bookingStart = new Date(b.start_time);
       const bookingEnd = new Date(b.end_time);
-      return bookingStart < dayEnd && bookingEnd > dayStart;
+      return bookingStart < slotEnd && bookingEnd > slotStart;
     });
   };
 
-  const getMaintenanceForDay = (date: Date) => {
-    const dayStart = new Date(date);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(date);
-    dayEnd.setHours(23, 59, 59, 999);
+  const getMaintenanceForSlot = (date: Date, hour: number) => {
+    const slotStart = new Date(date);
+    slotStart.setHours(hour, 0, 0, 0);
+    const slotEnd = new Date(date);
+    slotEnd.setHours(hour + 1, 0, 0, 0);
 
     return maintenance.filter((m) => {
       const maintStart = new Date(m.start_time);
       const maintEnd = new Date(m.end_time);
-      return maintStart < dayEnd && maintEnd > dayStart;
+      return maintStart < slotEnd && maintEnd > slotStart;
     });
   };
 
-  const handleDayClick = (date: Date) => {
-    const dayMaintenance = getMaintenanceForDay(date);
-    if (dayMaintenance.length > 0) {
-      alert('This day has scheduled maintenance');
+  const isSlotAvailable = (date: Date, hour: number) => {
+    const slotBookings = getBookingsForSlot(date, hour);
+    const slotMaintenance = getMaintenanceForSlot(date, hour);
+    return slotBookings.length === 0 && slotMaintenance.length === 0;
+  };
+
+  const isSlotInSelection = (dayIndex: number, hour: number) => {
+    if (!dragStart || !dragEnd) return false;
+
+    const minDay = Math.min(dragStart.dayIndex, dragEnd.dayIndex);
+    const maxDay = Math.max(dragStart.dayIndex, dragEnd.dayIndex);
+    const minHour = Math.min(dragStart.hour, dragEnd.hour);
+    const maxHour = Math.max(dragStart.hour, dragEnd.hour);
+
+    return dayIndex >= minDay && dayIndex <= maxDay && hour >= minHour && hour <= maxHour;
+  };
+
+  const handleMouseDown = (dayIndex: number, hour: number) => {
+    const date = weekDates[dayIndex];
+    if (!isSlotAvailable(date, hour)) {
+      const slotBookings = getBookingsForSlot(date, hour);
+      const userBooking = slotBookings.find((b) => b.user_id === currentUserId);
+      if (userBooking || isAdmin) {
+        setSelectedBooking(slotBookings[0]);
+        setShowModal(true);
+      }
       return;
     }
 
-    const dayBookings = getBookingsForDay(date);
-    const userBooking = dayBookings.find((b) => b.user_id === currentUserId);
+    setIsDragging(true);
+    setDragStart({ dayIndex, hour });
+    setDragEnd({ dayIndex, hour });
+  };
 
-    if (userBooking) {
-      setSelectedBooking(userBooking);
-      setShowModal(true);
-      return;
+  const handleMouseEnter = (dayIndex: number, hour: number) => {
+    if (isDragging) {
+      setDragEnd({ dayIndex, hour });
     }
+  };
 
-    setSelectedDate(date);
-    setShowModal(true);
+  const handleMouseUp = useCallback(() => {
+    if (isDragging && dragStart && dragEnd) {
+      // Check if all slots in selection are available
+      const minDay = Math.min(dragStart.dayIndex, dragEnd.dayIndex);
+      const maxDay = Math.max(dragStart.dayIndex, dragEnd.dayIndex);
+      const minHour = Math.min(dragStart.hour, dragEnd.hour);
+      const maxHour = Math.max(dragStart.hour, dragEnd.hour);
+
+      let allAvailable = true;
+      for (let d = minDay; d <= maxDay; d++) {
+        for (let h = minHour; h <= maxHour; h++) {
+          if (!isSlotAvailable(weekDates[d], h)) {
+            allAvailable = false;
+            break;
+          }
+        }
+        if (!allAvailable) break;
+      }
+
+      if (allAvailable) {
+        setShowModal(true);
+      } else {
+        setDragStart(null);
+        setDragEnd(null);
+      }
+    }
+    setIsDragging(false);
+  }, [isDragging, dragStart, dragEnd, weekDates]);
+
+  const getSelectionSummary = () => {
+    if (!dragStart || !dragEnd) return null;
+
+    const minDay = Math.min(dragStart.dayIndex, dragEnd.dayIndex);
+    const maxDay = Math.max(dragStart.dayIndex, dragEnd.dayIndex);
+    const minHour = Math.min(dragStart.hour, dragEnd.hour);
+    const maxHour = Math.max(dragStart.hour, dragEnd.hour);
+
+    const startDate = weekDates[minDay];
+    const endDate = weekDates[maxDay];
+    const numDays = maxDay - minDay + 1;
+    const numHours = maxHour - minHour + 1;
+
+    return {
+      startDate,
+      endDate,
+      startHour: minHour,
+      endHour: maxHour + 1,
+      numDays,
+      numHours,
+      totalHours: numDays * numHours,
+    };
   };
 
   const handleCreateBooking = async () => {
-    if (!selectedDate) return;
+    const selection = getSelectionSummary();
+    if (!selection) return;
 
     setLoading(true);
     try {
-      const startTime = new Date(selectedDate);
-      startTime.setHours(startHour, 0, 0, 0);
+      const startTime = new Date(selection.startDate);
+      startTime.setHours(selection.startHour, 0, 0, 0);
 
-      const endTime = new Date(startTime);
-      if (bookingDays > 1) {
-        // Multi-day booking: end at same time on final day
-        endTime.setDate(endTime.getDate() + bookingDays - 1);
-        endTime.setHours(startHour + bookingHours);
-      } else {
-        // Single day: add hours
-        endTime.setHours(startHour + bookingHours);
-      }
+      const endTime = new Date(selection.endDate);
+      endTime.setHours(selection.endHour, 0, 0, 0);
 
       const res = await fetch('/api/bookings', {
         method: 'POST',
@@ -193,25 +269,21 @@ export default function CalendarView({
 
   const closeModal = () => {
     setShowModal(false);
-    setSelectedDate(null);
+    setDragStart(null);
+    setDragEnd(null);
     setSelectedBooking(null);
     setBookingNotes('');
-    setBookingDays(1);
-    setBookingHours(2);
-    setStartHour(8);
-  };
-
-  const getTotalHours = () => {
-    if (bookingDays > 1) {
-      return bookingDays * bookingHours;
-    }
-    return bookingHours;
   };
 
   return (
-    <div>
+    <div
+      ref={calendarRef}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={() => isDragging && handleMouseUp()}
+      className="select-none"
+    >
       {/* Week Navigation */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <button onClick={() => setWeekOffset(weekOffset - 1)} className="btn-secondary">
           ← Previous
         </button>
@@ -233,158 +305,139 @@ export default function CalendarView({
         </button>
       </div>
 
-      {/* Calendar Grid - Day View */}
-      <div className="grid grid-cols-7 gap-2">
-        {weekDates.map((date, i) => {
-          const dayBookings = getBookingsForDay(date);
-          const dayMaintenance = getMaintenanceForDay(date);
-          const isPast = date < new Date(new Date().setHours(0, 0, 0, 0));
+      {/* Instructions */}
+      <p className="text-sm text-gray-500 mb-4 text-center">
+        Click and drag across time slots to create a booking
+      </p>
 
-          return (
-            <div
-              key={i}
-              className={`card p-3 min-h-[180px] cursor-pointer transition-all hover:shadow-md ${
-                isPast ? 'opacity-50' : ''
-              } ${dayMaintenance.length > 0 ? 'bg-yellow-50 border-yellow-200' : ''}`}
-              onClick={() => !isPast && handleDayClick(date)}
-            >
+      {/* Calendar Grid */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {/* Header Row */}
+        <div className="grid grid-cols-8 border-b border-gray-200">
+          <div className="p-2 border-r border-gray-200"></div>
+          {weekDates.map((date, i) => (
+            <div key={i} className="border-r border-gray-200 last:border-r-0">
               {formatDateHeader(date)}
-
-              <div className="mt-2 space-y-1">
-                {dayMaintenance.map((m) => (
-                  <div
-                    key={`m-${m.id}`}
-                    className="text-xs p-2 rounded text-white truncate"
-                    style={{ backgroundColor: MAINTENANCE_COLOR }}
-                    title={m.description}
-                  >
-                    🔧 {m.description}
-                  </div>
-                ))}
-                {dayBookings.map((b) => {
-                  const start = new Date(b.start_time);
-                  const end = new Date(b.end_time);
-                  return (
-                    <div
-                      key={`b-${b.id}`}
-                      className="text-xs p-2 rounded text-white truncate"
-                      style={{ backgroundColor: b.user_color }}
-                      title={`${b.user_name}: ${start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (b.user_id === currentUserId || isAdmin) {
-                          setSelectedBooking(b);
-                          setShowModal(true);
-                        }
-                      }}
-                    >
-                      <div className="font-medium">{b.user_name}</div>
-                      <div className="opacity-80">
-                        {start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} -
-                        {end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
             </div>
-          );
-        })}
+          ))}
+        </div>
+
+        {/* Time Slots */}
+        <div className="max-h-[600px] overflow-y-auto">
+          {HOURS.map((hour) => (
+            <div key={hour} className="grid grid-cols-8 border-b border-gray-100 last:border-b-0">
+              <div className="p-2 text-xs text-gray-500 text-right pr-3 border-r border-gray-200 bg-gray-50">
+                {formatHour(hour)}
+              </div>
+              {weekDates.map((date, dayIndex) => {
+                const slotBookings = getBookingsForSlot(date, hour);
+                const slotMaintenance = getMaintenanceForSlot(date, hour);
+                const isAvailable = isSlotAvailable(date, hour);
+                const isSelected = isSlotInSelection(dayIndex, hour);
+                const isPast = new Date(date.setHours(hour)) < new Date();
+
+                return (
+                  <div
+                    key={`${hour}-${dayIndex}`}
+                    className={`
+                      relative h-12 border-r border-gray-100 last:border-r-0 transition-colors
+                      ${isAvailable && !isPast ? 'cursor-crosshair hover:bg-sky-50' : ''}
+                      ${isSelected ? 'bg-sky-100' : ''}
+                      ${isPast && isAvailable ? 'bg-gray-50' : ''}
+                    `}
+                    onMouseDown={() => !isPast && handleMouseDown(dayIndex, hour)}
+                    onMouseEnter={() => handleMouseEnter(dayIndex, hour)}
+                  >
+                    {slotMaintenance.map((m) => (
+                      <div
+                        key={`m-${m.id}`}
+                        className="absolute inset-1 rounded text-xs p-1 text-white overflow-hidden"
+                        style={{ backgroundColor: MAINTENANCE_COLOR }}
+                        title={m.description}
+                      >
+                        🔧 {m.description}
+                      </div>
+                    ))}
+                    {slotBookings.map((b) => (
+                      <div
+                        key={`b-${b.id}`}
+                        className="absolute inset-1 rounded text-xs p-1 text-white overflow-hidden cursor-pointer hover:opacity-90"
+                        style={{ backgroundColor: b.user_color }}
+                        title={`${b.user_name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (b.user_id === currentUserId || isAdmin) {
+                            setSelectedBooking(b);
+                            setShowModal(true);
+                          }
+                        }}
+                      >
+                        <span className="font-medium">{b.user_name}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Legend */}
-      <div className="mt-4 flex items-center gap-4 text-sm text-gray-500">
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded" style={{ backgroundColor: MAINTENANCE_COLOR }}></div>
+      <div className="mt-4 flex items-center gap-6 text-sm text-gray-500">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-sky-100 border border-sky-200"></div>
+          <span>Selected</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded" style={{ backgroundColor: MAINTENANCE_COLOR }}></div>
           <span>Maintenance</span>
         </div>
-        <span>Click a day to book</span>
       </div>
 
       {/* Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-content max-w-md" onClick={(e) => e.stopPropagation()}>
-            {selectedDate && !selectedBooking ? (
+            {dragStart && dragEnd && !selectedBooking ? (
               <>
-                <h2 className="text-xl font-bold mb-2">New Booking</h2>
-                <p className="text-gray-500 mb-6">
-                  Starting{' '}
-                  {selectedDate.toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                </p>
-
-                <div className="space-y-5">
-                  {/* Start Time */}
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Start Time</label>
-                    <select
-                      value={startHour}
-                      onChange={(e) => setStartHour(parseInt(e.target.value))}
-                      className="input"
-                    >
-                      {Array.from({ length: 14 }, (_, i) => i + 6).map((hour) => (
-                        <option key={hour} value={hour}>
-                          {formatHour(hour)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Number of Days */}
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Number of Days: <span className="text-sky-600">{bookingDays}</span>
-                    </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="14"
-                      value={bookingDays}
-                      onChange={(e) => setBookingDays(parseInt(e.target.value))}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
-                    />
-                    <div className="flex justify-between text-xs text-gray-400 mt-1">
-                      <span>1 day</span>
-                      <span>14 days</span>
+                <h2 className="text-xl font-bold mb-4">New Booking</h2>
+                {(() => {
+                  const selection = getSelectionSummary();
+                  if (!selection) return null;
+                  return (
+                    <div className="bg-sky-50 p-4 rounded-lg mb-6">
+                      <div className="space-y-2 text-sm">
+                        <p>
+                          <strong>Date{selection.numDays > 1 ? 's' : ''}:</strong>{' '}
+                          {selection.startDate.toLocaleDateString('en-US', {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                          {selection.numDays > 1 && (
+                            <>
+                              {' '}- {selection.endDate.toLocaleDateString('en-US', {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </>
+                          )}
+                        </p>
+                        <p>
+                          <strong>Time:</strong>{' '}
+                          {formatHour(selection.startHour)} - {formatHour(selection.endHour)}
+                        </p>
+                        <p className="text-sky-700 font-medium">
+                          {selection.numDays} day{selection.numDays > 1 ? 's' : ''} × {selection.numHours} hour{selection.numHours > 1 ? 's' : ''} = {selection.totalHours} total hours
+                        </p>
+                      </div>
                     </div>
-                  </div>
+                  );
+                })()}
 
-                  {/* Hours per Day */}
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Hours {bookingDays > 1 ? 'per Day' : ''}: <span className="text-sky-600">{bookingHours}</span>
-                    </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="12"
-                      value={bookingHours}
-                      onChange={(e) => setBookingHours(parseInt(e.target.value))}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
-                    />
-                    <div className="flex justify-between text-xs text-gray-400 mt-1">
-                      <span>1 hour</span>
-                      <span>12 hours</span>
-                    </div>
-                  </div>
-
-                  {/* Summary */}
-                  <div className="bg-sky-50 p-3 rounded-lg">
-                    <p className="text-sm text-sky-800">
-                      <strong>Summary:</strong> {bookingDays} day{bookingDays > 1 ? 's' : ''}, {bookingHours} hour{bookingHours > 1 ? 's' : ''} {bookingDays > 1 ? 'each day' : ''}
-                      <br />
-                      <span className="text-sky-600">
-                        {formatHour(startHour)} - {formatHour(startHour + bookingHours)}
-                        {bookingDays > 1 && ` (${getTotalHours()} total hours)`}
-                      </span>
-                    </p>
-                  </div>
-
-                  {/* Notes */}
+                <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">Notes (optional)</label>
                     <input
@@ -392,17 +445,17 @@ export default function CalendarView({
                       value={bookingNotes}
                       onChange={(e) => setBookingNotes(e.target.value)}
                       className="input"
-                      placeholder="e.g., Cross-country flight"
+                      placeholder="e.g., Cross-country flight, Training"
                     />
                   </div>
 
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex gap-2">
                     <button
                       onClick={handleCreateBooking}
                       disabled={loading}
                       className="btn-primary flex-1"
                     >
-                      {loading ? 'Booking...' : 'Book Flight'}
+                      {loading ? 'Booking...' : 'Confirm Booking'}
                     </button>
                     <button onClick={closeModal} className="btn-secondary">
                       Cancel
@@ -414,34 +467,42 @@ export default function CalendarView({
               <>
                 <h2 className="text-xl font-bold mb-4">Booking Details</h2>
                 <div className="space-y-3 mb-6">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <div
-                      className="w-4 h-4 rounded"
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
                       style={{ backgroundColor: selectedBooking.user_color }}
-                    />
-                    <span className="font-medium">{selectedBooking.user_name}</span>
+                    >
+                      {selectedBooking.user_name.charAt(0)}
+                    </div>
+                    <span className="font-medium text-lg">{selectedBooking.user_name}</span>
                   </div>
-                  <p className="text-gray-500">
-                    {new Date(selectedBooking.start_time).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
-                  </p>
-                  <p className="text-gray-500">
-                    {new Date(selectedBooking.start_time).toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}{' '}
-                    -{' '}
-                    {new Date(selectedBooking.end_time).toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}
-                  </p>
-                  {selectedBooking.notes && (
-                    <p className="text-gray-600">Notes: {selectedBooking.notes}</p>
-                  )}
+                  <div className="bg-gray-50 p-3 rounded-lg space-y-1">
+                    <p className="text-gray-600">
+                      <strong>Date:</strong>{' '}
+                      {new Date(selectedBooking.start_time).toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                    </p>
+                    <p className="text-gray-600">
+                      <strong>Time:</strong>{' '}
+                      {new Date(selectedBooking.start_time).toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}{' '}
+                      -{' '}
+                      {new Date(selectedBooking.end_time).toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                    {selectedBooking.notes && (
+                      <p className="text-gray-600">
+                        <strong>Notes:</strong> {selectedBooking.notes}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex gap-2">

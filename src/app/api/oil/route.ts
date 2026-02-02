@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     }
 
     const user = session.user as any;
-    const { quarts, hobbsTime, notes } = await request.json();
+    const { quarts, hobbsTime, date, notes } = await request.json();
 
     if (!quarts || !hobbsTime) {
       return NextResponse.json({ error: 'Quarts and Hobbs time are required' }, { status: 400 });
@@ -44,9 +44,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid quarts amount' }, { status: 400 });
     }
 
+    // Use provided date or current date
+    const logDate = date ? new Date(date).toISOString() : new Date().toISOString();
+
     const result = await run(
       'INSERT INTO oil_logs (user_id, date, quarts, hobbs_time, notes) VALUES (?, ?, ?, ?, ?)',
-      [user.id, new Date().toISOString(), quarts, hobbsTime, notes || null]
+      [user.id, logDate, quarts, hobbsTime, notes || null]
     );
 
     return NextResponse.json({

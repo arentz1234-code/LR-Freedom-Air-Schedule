@@ -7,6 +7,7 @@ export default function OilLogForm() {
   const router = useRouter();
   const [quarts, setQuarts] = useState('');
   const [hobbsTime, setHobbsTime] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -23,6 +24,7 @@ export default function OilLogForm() {
         body: JSON.stringify({
           quarts: parseFloat(quarts),
           hobbsTime: parseFloat(hobbsTime),
+          date,
           notes,
         }),
       });
@@ -30,6 +32,7 @@ export default function OilLogForm() {
       if (res.ok) {
         setQuarts('');
         setHobbsTime('');
+        setDate(new Date().toISOString().split('T')[0]);
         setNotes('');
         router.refresh();
       } else {
@@ -51,7 +54,7 @@ export default function OilLogForm() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label className="block text-sm font-medium mb-1">Quarts Added *</label>
           <input
@@ -82,13 +85,24 @@ export default function OilLogForm() {
         </div>
 
         <div>
+          <label className="block text-sm font-medium mb-1">Date *</label>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="input"
+            required
+          />
+        </div>
+
+        <div>
           <label className="block text-sm font-medium mb-1">Notes</label>
           <input
             type="text"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             className="input"
-            placeholder="e.g., Pre-flight check"
+            placeholder="e.g., Pre-flight"
           />
         </div>
       </div>

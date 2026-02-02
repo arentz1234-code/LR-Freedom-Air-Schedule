@@ -36,6 +36,9 @@ export default async function DashboardPage() {
     redirect('/login');
   }
 
+  // Redirect to calendar as the main page
+  redirect('/calendar');
+
   const user = session.user as any;
 
   // Fetch upcoming bookings
