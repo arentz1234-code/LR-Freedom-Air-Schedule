@@ -29,8 +29,8 @@ export async function POST(request: Request) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Determine role - owner gets admin privileges, leasor is regular user
-    const role = requestedRole === 'owner' ? 'owner' : 'leasor';
+    // Determine role - owner gets admin privileges, renter is regular user
+    const role = requestedRole === 'owner' ? 'owner' : 'renter';
 
     // Create user
     const result = await run(

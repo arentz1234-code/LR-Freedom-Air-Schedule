@@ -10,7 +10,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<'owner' | 'leasor'>('leasor');
+  const [role, setRole] = useState<'owner' | 'renter'>('renter');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -138,12 +138,12 @@ export default function RegisterPage() {
                 <input
                   type="radio"
                   name="role"
-                  checked={role === 'leasor'}
-                  onChange={() => setRole('leasor')}
+                  checked={role === 'renter'}
+                  onChange={() => setRole('renter')}
                   className="w-4 h-4 text-sky-500"
                 />
                 <div>
-                  <span className="font-medium">Leasor</span>
+                  <span className="font-medium">Renter</span>
                   <p className="text-xs text-gray-500">Book and fly the aircraft</p>
                 </div>
               </label>
