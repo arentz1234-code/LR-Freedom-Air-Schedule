@@ -207,10 +207,10 @@ export default function AdminActions({ users, oilLogs, maintenance, maintenanceC
       </div>
 
       {/* Maintenance Section */}
-      <div className="card lg:col-span-2">
-        <div className="p-4 border-b border-gray-100">
-          <h2 className="font-semibold">Scheduled Maintenance</h2>
-          <p className="text-sm text-gray-500">Delete scheduled maintenance entries</p>
+      <div className="card lg:col-span-2 mt-6">
+        <div className="p-4 border-b border-gray-100 bg-yellow-50">
+          <h2 className="font-semibold text-lg">Scheduled Maintenance</h2>
+          <p className="text-sm text-gray-500">Click Delete to remove maintenance entries</p>
         </div>
         <div className="p-4">
           {maintenance.length === 0 ? (
