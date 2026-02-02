@@ -480,10 +480,6 @@ export default function CalendarView({
                             day: 'numeric',
                           })} at {formatHour(selection.endHour)}
                         </p>
-                        <p className="text-sky-700 font-medium pt-2 border-t border-sky-200">
-                          {selection.totalHours} continuous hours
-                          {selection.numDays > 1 && ` (${selection.numDays} days)`}
-                        </p>
                       </div>
                     </div>
                   );
