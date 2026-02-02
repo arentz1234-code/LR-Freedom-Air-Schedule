@@ -5,8 +5,8 @@ import Navigation from '@/components/Navigation';
 import { initDb } from '@/lib/db';
 
 export const metadata: Metadata = {
-  title: 'LR Freedom Air Scheduler',
-  description: 'Aircraft booking calendar for LR Freedom Air',
+  title: 'LR Freedom Air, LLC Scheduler',
+  description: 'Aircraft booking calendar for LR Freedom Air, LLC',
 };
 
 // Initialize database on server start

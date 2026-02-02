@@ -25,7 +25,7 @@ export default function Navigation({ session }: NavigationProps) {
               </svg>
             </div>
             <div>
-              <h1 className="font-bold text-lg text-gray-900">LR Freedom Air</h1>
+              <h1 className="font-bold text-lg text-gray-900">LR Freedom Air, LLC</h1>
               <p className="text-xs text-gray-500">Aircraft Scheduler</p>
             </div>
           </Link>

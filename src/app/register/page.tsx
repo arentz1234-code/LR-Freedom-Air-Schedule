@@ -60,7 +60,7 @@ export default function RegisterPage() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold">Create Account</h1>
-          <p className="text-gray-500 mt-1">Join LR Freedom Air</p>
+          <p className="text-gray-500 mt-1">Join LR Freedom Air, LLC</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
