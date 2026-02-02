@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { MAINTENANCE_COLOR } from '@/lib/db';
 
@@ -50,6 +50,15 @@ export default function CalendarView({
 
   // Drag selection state
   const [isDragging, setIsDragging] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Update current time every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
   const [dragStart, setDragStart] = useState<SlotKey | null>(null);
   const [dragEnd, setDragEnd] = useState<SlotKey | null>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
@@ -414,7 +423,15 @@ export default function CalendarView({
                 const slotMaintenance = getMaintenanceForSlot(date, hour);
                 const isAvailable = isSlotAvailable(date, hour);
                 const isSelected = isSlotInSelection(dayIndex, hour);
-                const isPast = new Date(date.setHours(hour)) < new Date();
+                const slotDate = new Date(date);
+                slotDate.setHours(hour, 0, 0, 0);
+                const isPast = slotDate < new Date();
+
+                // Check if current time indicator should show in this slot
+                const isToday = date.toDateString() === currentTime.toDateString();
+                const currentHour = currentTime.getHours();
+                const showTimeIndicator = isToday && hour === currentHour;
+                const timeIndicatorPosition = (currentTime.getMinutes() / 60) * 100;
 
                 return (
                   <div
@@ -428,6 +445,16 @@ export default function CalendarView({
                     onMouseDown={() => !isPast && handleMouseDown(dayIndex, hour)}
                     onMouseEnter={() => handleMouseEnter(dayIndex, hour)}
                   >
+                    {/* Current time indicator */}
+                    {showTimeIndicator && (
+                      <div
+                        className="absolute left-0 right-0 z-20 flex items-center"
+                        style={{ top: `${timeIndicatorPosition}%` }}
+                      >
+                        <div className="w-2 h-2 bg-red-500 rounded-full -ml-1" />
+                        <div className="flex-1 h-0.5 bg-red-500" />
+                      </div>
+                    )}
                     {slotMaintenance.map((m, idx) => {
                       const maintStart = new Date(m.start_time);
                       const isFirstSlot = maintStart.getHours() === hour &&
@@ -445,17 +472,19 @@ export default function CalendarView({
                     })}
                     {slotBookings.map((b) => {
                       const isStart = isBookingStart(date, hour, b);
-                      const isContinuation = isBookingContinuation(date, hour, b);
+                      // Darken color for accent bar
+                      const darkerColor = b.user_color.replace(/^#/, '');
+                      const r = Math.max(0, parseInt(darkerColor.slice(0, 2), 16) - 60);
+                      const g = Math.max(0, parseInt(darkerColor.slice(2, 4), 16) - 60);
+                      const bl = Math.max(0, parseInt(darkerColor.slice(4, 6), 16) - 60);
+                      const accentColor = `rgb(${r}, ${g}, ${bl})`;
+
                       return (
                         <div
                           key={`b-${b.id}`}
-                          className={`absolute inset-0 text-xs p-1 text-white overflow-hidden cursor-pointer hover:opacity-90 ${
+                          className={`absolute inset-0 text-xs text-white overflow-hidden cursor-pointer hover:opacity-90 flex ${
                             isStart ? 'rounded-t' : ''
                           }`}
-                          style={{
-                            backgroundColor: b.user_color,
-                            borderTop: isContinuation ? 'none' : undefined,
-                          }}
                           title={`${b.user_name}`}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -465,9 +494,20 @@ export default function CalendarView({
                             }
                           }}
                         >
-                          {isStart && (
-                            <span className="font-medium">{b.user_name}</span>
-                          )}
+                          {/* Left accent bar */}
+                          <div
+                            className="w-1 h-full flex-shrink-0"
+                            style={{ backgroundColor: accentColor }}
+                          />
+                          {/* Main booking content */}
+                          <div
+                            className="flex-1 p-1"
+                            style={{ backgroundColor: b.user_color }}
+                          >
+                            {isStart && (
+                              <span className="font-medium">{b.user_name}</span>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
