@@ -28,8 +28,6 @@ interface CalendarViewProps {
   isAdmin: boolean;
 }
 
-const HOURS = Array.from({ length: 14 }, (_, i) => i + 6); // 6 AM to 8 PM
-
 export default function CalendarView({
   bookings,
   maintenance,
@@ -39,9 +37,11 @@ export default function CalendarView({
   const router = useRouter();
   const [weekOffset, setWeekOffset] = useState(0);
   const [showModal, setShowModal] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState<{ date: Date; hour: number } | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [bookingNotes, setBookingNotes] = useState('');
-  const [bookingDuration, setBookingDuration] = useState(2);
+  const [bookingDays, setBookingDays] = useState(1);
+  const [bookingHours, setBookingHours] = useState(2);
+  const [startHour, setStartHour] = useState(8);
   const [loading, setLoading] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
@@ -63,10 +63,11 @@ export default function CalendarView({
 
   const formatDateHeader = (date: Date) => {
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const isToday = date.toDateString() === new Date().toDateString();
     return (
-      <div className="text-center">
+      <div className={`text-center p-2 ${isToday ? 'bg-sky-100 rounded-lg' : ''}`}>
         <div className="text-xs text-gray-500">{dayNames[date.getDay()]}</div>
-        <div className="font-semibold">{date.getDate()}</div>
+        <div className={`text-lg font-semibold ${isToday ? 'text-sky-600' : ''}`}>{date.getDate()}</div>
       </div>
     );
   };
@@ -74,66 +75,72 @@ export default function CalendarView({
   const formatHour = (hour: number) => {
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-    return `${displayHour} ${ampm}`;
+    return `${displayHour}:00 ${ampm}`;
   };
 
-  const getBookingsForSlot = (date: Date, hour: number) => {
-    const slotStart = new Date(date);
-    slotStart.setHours(hour, 0, 0, 0);
-    const slotEnd = new Date(date);
-    slotEnd.setHours(hour + 1, 0, 0, 0);
+  const getBookingsForDay = (date: Date) => {
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(date);
+    dayEnd.setHours(23, 59, 59, 999);
 
     return bookings.filter((b) => {
       const bookingStart = new Date(b.start_time);
       const bookingEnd = new Date(b.end_time);
-      return bookingStart < slotEnd && bookingEnd > slotStart;
+      return bookingStart < dayEnd && bookingEnd > dayStart;
     });
   };
 
-  const getMaintenanceForSlot = (date: Date, hour: number) => {
-    const slotStart = new Date(date);
-    slotStart.setHours(hour, 0, 0, 0);
-    const slotEnd = new Date(date);
-    slotEnd.setHours(hour + 1, 0, 0, 0);
+  const getMaintenanceForDay = (date: Date) => {
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(date);
+    dayEnd.setHours(23, 59, 59, 999);
 
     return maintenance.filter((m) => {
       const maintStart = new Date(m.start_time);
       const maintEnd = new Date(m.end_time);
-      return maintStart < slotEnd && maintEnd > slotStart;
+      return maintStart < dayEnd && maintEnd > dayStart;
     });
   };
 
-  const isSlotAvailable = (date: Date, hour: number) => {
-    const slotBookings = getBookingsForSlot(date, hour);
-    const slotMaintenance = getMaintenanceForSlot(date, hour);
-    return slotBookings.length === 0 && slotMaintenance.length === 0;
-  };
-
-  const handleSlotClick = (date: Date, hour: number) => {
-    if (!isSlotAvailable(date, hour)) {
-      // Check if it's the user's own booking
-      const slotBookings = getBookingsForSlot(date, hour);
-      const userBooking = slotBookings.find((b) => b.user_id === currentUserId);
-      if (userBooking) {
-        setSelectedBooking(userBooking);
-        setShowModal(true);
-      }
+  const handleDayClick = (date: Date) => {
+    const dayMaintenance = getMaintenanceForDay(date);
+    if (dayMaintenance.length > 0) {
+      alert('This day has scheduled maintenance');
       return;
     }
-    setSelectedSlot({ date, hour });
+
+    const dayBookings = getBookingsForDay(date);
+    const userBooking = dayBookings.find((b) => b.user_id === currentUserId);
+
+    if (userBooking) {
+      setSelectedBooking(userBooking);
+      setShowModal(true);
+      return;
+    }
+
+    setSelectedDate(date);
     setShowModal(true);
   };
 
   const handleCreateBooking = async () => {
-    if (!selectedSlot) return;
+    if (!selectedDate) return;
 
     setLoading(true);
     try {
-      const startTime = new Date(selectedSlot.date);
-      startTime.setHours(selectedSlot.hour, 0, 0, 0);
+      const startTime = new Date(selectedDate);
+      startTime.setHours(startHour, 0, 0, 0);
 
       const endTime = new Date(startTime);
-      endTime.setHours(startTime.getHours() + bookingDuration);
+      if (bookingDays > 1) {
+        // Multi-day booking: end at same time on final day
+        endTime.setDate(endTime.getDate() + bookingDays - 1);
+        endTime.setHours(startHour + bookingHours);
+      } else {
+        // Single day: add hours
+        endTime.setHours(startHour + bookingHours);
+      }
 
       const res = await fetch('/api/bookings', {
         method: 'POST',
@@ -146,10 +153,7 @@ export default function CalendarView({
       });
 
       if (res.ok) {
-        setShowModal(false);
-        setSelectedSlot(null);
-        setBookingNotes('');
-        setBookingDuration(2);
+        closeModal();
         router.refresh();
       } else {
         const data = await res.json();
@@ -174,8 +178,7 @@ export default function CalendarView({
       });
 
       if (res.ok) {
-        setShowModal(false);
-        setSelectedBooking(null);
+        closeModal();
         router.refresh();
       } else {
         const data = await res.json();
@@ -190,136 +193,210 @@ export default function CalendarView({
 
   const closeModal = () => {
     setShowModal(false);
-    setSelectedSlot(null);
+    setSelectedDate(null);
     setSelectedBooking(null);
     setBookingNotes('');
-    setBookingDuration(2);
+    setBookingDays(1);
+    setBookingHours(2);
+    setStartHour(8);
+  };
+
+  const getTotalHours = () => {
+    if (bookingDays > 1) {
+      return bookingDays * bookingHours;
+    }
+    return bookingHours;
   };
 
   return (
     <div>
       {/* Week Navigation */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-6">
         <button onClick={() => setWeekOffset(weekOffset - 1)} className="btn-secondary">
-          ← Previous Week
+          ← Previous
         </button>
         <div className="text-center">
-          <span className="font-semibold">
+          <span className="font-semibold text-lg">
             {weekDates[0].toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
           </span>
           {weekOffset !== 0 && (
             <button
               onClick={() => setWeekOffset(0)}
-              className="ml-2 text-sm text-sky-600 hover:underline"
+              className="ml-3 text-sm text-sky-600 hover:underline"
             >
               Today
             </button>
           )}
         </div>
         <button onClick={() => setWeekOffset(weekOffset + 1)} className="btn-secondary">
-          Next Week →
+          Next →
         </button>
       </div>
 
-      {/* Calendar Grid */}
-      <div className="calendar-grid bg-white">
-        {/* Header */}
-        <div className="calendar-header">
-          <div className="calendar-header-cell"></div>
-          {weekDates.map((date, i) => (
-            <div key={i} className="calendar-header-cell">
+      {/* Calendar Grid - Day View */}
+      <div className="grid grid-cols-7 gap-2">
+        {weekDates.map((date, i) => {
+          const dayBookings = getBookingsForDay(date);
+          const dayMaintenance = getMaintenanceForDay(date);
+          const isPast = date < new Date(new Date().setHours(0, 0, 0, 0));
+
+          return (
+            <div
+              key={i}
+              className={`card p-3 min-h-[180px] cursor-pointer transition-all hover:shadow-md ${
+                isPast ? 'opacity-50' : ''
+              } ${dayMaintenance.length > 0 ? 'bg-yellow-50 border-yellow-200' : ''}`}
+              onClick={() => !isPast && handleDayClick(date)}
+            >
               {formatDateHeader(date)}
-            </div>
-          ))}
-        </div>
 
-        {/* Body */}
-        <div className="calendar-body">
-          {HOURS.map((hour) => (
-            <>
-              <div key={`time-${hour}`} className="time-label">
-                {formatHour(hour)}
-              </div>
-              {weekDates.map((date, dayIndex) => {
-                const slotBookings = getBookingsForSlot(date, hour);
-                const slotMaintenance = getMaintenanceForSlot(date, hour);
-                const isAvailable = isSlotAvailable(date, hour);
-
-                return (
+              <div className="mt-2 space-y-1">
+                {dayMaintenance.map((m) => (
                   <div
-                    key={`${hour}-${dayIndex}`}
-                    className={`calendar-cell ${isAvailable ? 'cursor-pointer' : ''}`}
-                    onClick={() => handleSlotClick(date, hour)}
+                    key={`m-${m.id}`}
+                    className="text-xs p-2 rounded text-white truncate"
+                    style={{ backgroundColor: MAINTENANCE_COLOR }}
+                    title={m.description}
                   >
-                    {slotMaintenance.map((m) => (
-                      <div
-                        key={`m-${m.id}`}
-                        className="booking-block"
-                        style={{ backgroundColor: MAINTENANCE_COLOR, top: 2 }}
-                      >
-                        🔧 {m.description}
-                      </div>
-                    ))}
-                    {slotBookings.map((b) => (
-                      <div
-                        key={`b-${b.id}`}
-                        className="booking-block"
-                        style={{ backgroundColor: b.user_color, top: 2 }}
-                      >
-                        {b.user_name}
-                      </div>
-                    ))}
+                    🔧 {m.description}
                   </div>
-                );
-              })}
-            </>
-          ))}
+                ))}
+                {dayBookings.map((b) => {
+                  const start = new Date(b.start_time);
+                  const end = new Date(b.end_time);
+                  return (
+                    <div
+                      key={`b-${b.id}`}
+                      className="text-xs p-2 rounded text-white truncate"
+                      style={{ backgroundColor: b.user_color }}
+                      title={`${b.user_name}: ${start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (b.user_id === currentUserId || isAdmin) {
+                          setSelectedBooking(b);
+                          setShowModal(true);
+                        }
+                      }}
+                    >
+                      <div className="font-medium">{b.user_name}</div>
+                      <div className="opacity-80">
+                        {start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} -
+                        {end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="mt-4 flex items-center gap-4 text-sm text-gray-500">
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: MAINTENANCE_COLOR }}></div>
+          <span>Maintenance</span>
         </div>
+        <span>Click a day to book</span>
       </div>
 
       {/* Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            {selectedSlot && !selectedBooking ? (
+          <div className="modal-content max-w-md" onClick={(e) => e.stopPropagation()}>
+            {selectedDate && !selectedBooking ? (
               <>
-                <h2 className="text-xl font-bold mb-4">New Booking</h2>
-                <p className="text-gray-500 mb-4">
-                  {selectedSlot.date.toLocaleDateString('en-US', {
+                <h2 className="text-xl font-bold mb-2">New Booking</h2>
+                <p className="text-gray-500 mb-6">
+                  Starting{' '}
+                  {selectedDate.toLocaleDateString('en-US', {
                     weekday: 'long',
                     month: 'long',
                     day: 'numeric',
-                  })}{' '}
-                  at {formatHour(selectedSlot.hour)}
+                  })}
                 </p>
 
-                <div className="space-y-4">
+                <div className="space-y-5">
+                  {/* Start Time */}
                   <div>
-                    <label className="block text-sm font-medium mb-1">Duration</label>
+                    <label className="block text-sm font-medium mb-2">Start Time</label>
                     <select
-                      value={bookingDuration}
-                      onChange={(e) => setBookingDuration(parseInt(e.target.value))}
+                      value={startHour}
+                      onChange={(e) => setStartHour(parseInt(e.target.value))}
                       className="input"
                     >
-                      <option value={1}>1 hour</option>
-                      <option value={2}>2 hours</option>
-                      <option value={3}>3 hours</option>
-                      <option value={4}>4 hours</option>
+                      {Array.from({ length: 14 }, (_, i) => i + 6).map((hour) => (
+                        <option key={hour} value={hour}>
+                          {formatHour(hour)}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
+                  {/* Number of Days */}
                   <div>
-                    <label className="block text-sm font-medium mb-1">Notes (optional)</label>
+                    <label className="block text-sm font-medium mb-2">
+                      Number of Days: <span className="text-sky-600">{bookingDays}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="14"
+                      value={bookingDays}
+                      onChange={(e) => setBookingDays(parseInt(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                    />
+                    <div className="flex justify-between text-xs text-gray-400 mt-1">
+                      <span>1 day</span>
+                      <span>14 days</span>
+                    </div>
+                  </div>
+
+                  {/* Hours per Day */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Hours {bookingDays > 1 ? 'per Day' : ''}: <span className="text-sky-600">{bookingHours}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="12"
+                      value={bookingHours}
+                      onChange={(e) => setBookingHours(parseInt(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                    />
+                    <div className="flex justify-between text-xs text-gray-400 mt-1">
+                      <span>1 hour</span>
+                      <span>12 hours</span>
+                    </div>
+                  </div>
+
+                  {/* Summary */}
+                  <div className="bg-sky-50 p-3 rounded-lg">
+                    <p className="text-sm text-sky-800">
+                      <strong>Summary:</strong> {bookingDays} day{bookingDays > 1 ? 's' : ''}, {bookingHours} hour{bookingHours > 1 ? 's' : ''} {bookingDays > 1 ? 'each day' : ''}
+                      <br />
+                      <span className="text-sky-600">
+                        {formatHour(startHour)} - {formatHour(startHour + bookingHours)}
+                        {bookingDays > 1 && ` (${getTotalHours()} total hours)`}
+                      </span>
+                    </p>
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Notes (optional)</label>
                     <input
                       type="text"
                       value={bookingNotes}
                       onChange={(e) => setBookingNotes(e.target.value)}
                       className="input"
-                      placeholder="e.g., Training flight"
+                      placeholder="e.g., Cross-country flight"
                     />
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 pt-2">
                     <button
                       onClick={handleCreateBooking}
                       disabled={loading}

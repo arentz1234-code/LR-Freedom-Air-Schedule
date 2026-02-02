@@ -66,7 +66,7 @@ export default function Navigation({ session }: NavigationProps) {
           <div className="flex items-center gap-4">
             {session ? (
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
+                <Link href="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
                   <div
                     className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold"
                     style={{ backgroundColor: user?.color || '#64748b' }}
@@ -77,7 +77,7 @@ export default function Navigation({ session }: NavigationProps) {
                     <p className="text-sm font-medium">{user?.name}</p>
                     <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
                   </div>
-                </div>
+                </Link>
                 <form action="/api/auth/signout" method="POST">
                   <button
                     type="submit"
