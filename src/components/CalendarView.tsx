@@ -100,6 +100,30 @@ export default function CalendarView({
     });
   };
 
+  // Check if this slot is the first hour of a booking on this day
+  const isBookingStart = (date: Date, hour: number, booking: Booking) => {
+    const bookingStart = new Date(booking.start_time);
+    const slotDate = new Date(date);
+    slotDate.setHours(0, 0, 0, 0);
+    const bookingDate = new Date(bookingStart);
+    bookingDate.setHours(0, 0, 0, 0);
+
+    // If booking starts on this day, check if this is the start hour
+    if (slotDate.getTime() === bookingDate.getTime()) {
+      return bookingStart.getHours() === hour;
+    }
+    // If booking started on a previous day, the first slot of this day is the "start"
+    return hour === HOURS[0];
+  };
+
+  // Check if slot is part of a booking but not the first slot
+  const isBookingContinuation = (date: Date, hour: number, booking: Booking) => {
+    const bookingStart = new Date(booking.start_time);
+    const slotStart = new Date(date);
+    slotStart.setHours(hour, 0, 0, 0);
+    return slotStart > bookingStart;
+  };
+
   const getMaintenanceForSlot = (date: Date, hour: number) => {
     const slotStart = new Date(date);
     slotStart.setHours(hour, 0, 0, 0);
@@ -404,33 +428,49 @@ export default function CalendarView({
                     onMouseDown={() => !isPast && handleMouseDown(dayIndex, hour)}
                     onMouseEnter={() => handleMouseEnter(dayIndex, hour)}
                   >
-                    {slotMaintenance.map((m) => (
-                      <div
-                        key={`m-${m.id}`}
-                        className="absolute inset-1 rounded text-xs p-1 text-white overflow-hidden"
-                        style={{ backgroundColor: MAINTENANCE_COLOR }}
-                        title={m.description}
-                      >
-                        🔧 {m.description}
-                      </div>
-                    ))}
-                    {slotBookings.map((b) => (
-                      <div
-                        key={`b-${b.id}`}
-                        className="absolute inset-1 rounded text-xs p-1 text-white overflow-hidden cursor-pointer hover:opacity-90"
-                        style={{ backgroundColor: b.user_color }}
-                        title={`${b.user_name}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (b.user_id === currentUserId || isAdmin) {
-                            setSelectedBooking(b);
-                            setShowModal(true);
-                          }
-                        }}
-                      >
-                        <span className="font-medium">{b.user_name}</span>
-                      </div>
-                    ))}
+                    {slotMaintenance.map((m, idx) => {
+                      const maintStart = new Date(m.start_time);
+                      const isFirstSlot = maintStart.getHours() === hour &&
+                        maintStart.toDateString() === date.toDateString();
+                      return (
+                        <div
+                          key={`m-${m.id}`}
+                          className="absolute inset-0 text-xs p-1 text-white overflow-hidden"
+                          style={{ backgroundColor: MAINTENANCE_COLOR }}
+                          title={m.description}
+                        >
+                          {(isFirstSlot || (hour === HOURS[0] && idx === 0)) && `🔧 ${m.description}`}
+                        </div>
+                      );
+                    })}
+                    {slotBookings.map((b) => {
+                      const isStart = isBookingStart(date, hour, b);
+                      const isContinuation = isBookingContinuation(date, hour, b);
+                      return (
+                        <div
+                          key={`b-${b.id}`}
+                          className={`absolute inset-0 text-xs p-1 text-white overflow-hidden cursor-pointer hover:opacity-90 ${
+                            isStart ? 'rounded-t' : ''
+                          }`}
+                          style={{
+                            backgroundColor: b.user_color,
+                            borderTop: isContinuation ? 'none' : undefined,
+                          }}
+                          title={`${b.user_name}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (b.user_id === currentUserId || isAdmin) {
+                              setSelectedBooking(b);
+                              setShowModal(true);
+                            }
+                          }}
+                        >
+                          {isStart && (
+                            <span className="font-medium">{b.user_name}</span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })}
