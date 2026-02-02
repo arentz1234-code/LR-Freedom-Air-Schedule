@@ -127,7 +127,26 @@ export default function CalendarView({
     const minHour = Math.min(dragStart.hour, dragEnd.hour);
     const maxHour = Math.max(dragStart.hour, dragEnd.hour);
 
-    return dayIndex >= minDay && dayIndex <= maxDay && hour >= minHour && hour <= maxHour;
+    // Single day selection
+    if (minDay === maxDay) {
+      return dayIndex === minDay && hour >= minHour && hour <= maxHour;
+    }
+
+    // Multi-day continuous selection
+    if (dayIndex < minDay || dayIndex > maxDay) return false;
+
+    // First day: from start hour to end of day
+    if (dayIndex === minDay) {
+      return hour >= minHour;
+    }
+
+    // Last day: from start of day to end hour
+    if (dayIndex === maxDay) {
+      return hour <= maxHour;
+    }
+
+    // Middle days: entire day is selected
+    return true;
   };
 
   const handleMouseDown = (dayIndex: number, hour: number) => {
@@ -155,21 +174,42 @@ export default function CalendarView({
 
   const handleMouseUp = useCallback(() => {
     if (isDragging && dragStart && dragEnd) {
-      // Check if all slots in selection are available
+      // Check if all slots in continuous selection are available
       const minDay = Math.min(dragStart.dayIndex, dragEnd.dayIndex);
       const maxDay = Math.max(dragStart.dayIndex, dragEnd.dayIndex);
       const minHour = Math.min(dragStart.hour, dragEnd.hour);
       const maxHour = Math.max(dragStart.hour, dragEnd.hour);
 
       let allAvailable = true;
-      for (let d = minDay; d <= maxDay; d++) {
-        for (let h = minHour; h <= maxHour; h++) {
+
+      for (let d = minDay; d <= maxDay && allAvailable; d++) {
+        // Determine hour range for this day (continuous booking)
+        let startH: number, endH: number;
+
+        if (minDay === maxDay) {
+          // Single day
+          startH = minHour;
+          endH = maxHour;
+        } else if (d === minDay) {
+          // First day: from start hour to end of day
+          startH = minHour;
+          endH = HOURS[HOURS.length - 1];
+        } else if (d === maxDay) {
+          // Last day: from start of day to end hour
+          startH = HOURS[0];
+          endH = maxHour;
+        } else {
+          // Middle days: entire day
+          startH = HOURS[0];
+          endH = HOURS[HOURS.length - 1];
+        }
+
+        for (let h = startH; h <= endH; h++) {
           if (!isSlotAvailable(weekDates[d], h)) {
             allAvailable = false;
             break;
           }
         }
-        if (!allAvailable) break;
       }
 
       if (allAvailable) {
@@ -190,10 +230,25 @@ export default function CalendarView({
     const minHour = Math.min(dragStart.hour, dragEnd.hour);
     const maxHour = Math.max(dragStart.hour, dragEnd.hour);
 
-    const startDate = weekDates[minDay];
-    const endDate = weekDates[maxDay];
+    const startDate = new Date(weekDates[minDay]);
+    const endDate = new Date(weekDates[maxDay]);
     const numDays = maxDay - minDay + 1;
     const numHours = maxHour - minHour + 1;
+
+    // Calculate continuous hours
+    // From start hour on first day to end hour on last day
+    let totalHours: number;
+    if (numDays === 1) {
+      totalHours = numHours;
+    } else {
+      // Hours remaining on first day (from start hour to midnight = 24 - startHour)
+      const firstDayHours = 24 - minHour;
+      // Full days in between (each is 24 hours)
+      const middleDaysHours = (numDays - 2) * 24;
+      // Hours on last day (from midnight to end hour)
+      const lastDayHours = maxHour + 1;
+      totalHours = firstDayHours + middleDaysHours + lastDayHours;
+    }
 
     return {
       startDate,
@@ -202,7 +257,7 @@ export default function CalendarView({
       endHour: maxHour + 1,
       numDays,
       numHours,
-      totalHours: numDays * numHours,
+      totalHours,
     };
   };
 
@@ -212,6 +267,7 @@ export default function CalendarView({
 
     setLoading(true);
     try {
+      // Continuous booking: start time on first day, end time on last day
       const startTime = new Date(selection.startDate);
       startTime.setHours(selection.startHour, 0, 0, 0);
 
@@ -409,28 +465,24 @@ export default function CalendarView({
                     <div className="bg-sky-50 p-4 rounded-lg mb-6">
                       <div className="space-y-2 text-sm">
                         <p>
-                          <strong>Date{selection.numDays > 1 ? 's' : ''}:</strong>{' '}
+                          <strong>Start:</strong>{' '}
                           {selection.startDate.toLocaleDateString('en-US', {
                             weekday: 'short',
                             month: 'short',
                             day: 'numeric',
-                          })}
-                          {selection.numDays > 1 && (
-                            <>
-                              {' '}- {selection.endDate.toLocaleDateString('en-US', {
-                                weekday: 'short',
-                                month: 'short',
-                                day: 'numeric',
-                              })}
-                            </>
-                          )}
+                          })} at {formatHour(selection.startHour)}
                         </p>
                         <p>
-                          <strong>Time:</strong>{' '}
-                          {formatHour(selection.startHour)} - {formatHour(selection.endHour)}
+                          <strong>End:</strong>{' '}
+                          {selection.endDate.toLocaleDateString('en-US', {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                          })} at {formatHour(selection.endHour)}
                         </p>
-                        <p className="text-sky-700 font-medium">
-                          {selection.numDays} day{selection.numDays > 1 ? 's' : ''} × {selection.numHours} hour{selection.numHours > 1 ? 's' : ''} = {selection.totalHours} total hours
+                        <p className="text-sky-700 font-medium pt-2 border-t border-sky-200">
+                          {selection.totalHours} continuous hours
+                          {selection.numDays > 1 && ` (${selection.numDays} days)`}
                         </p>
                       </div>
                     </div>
