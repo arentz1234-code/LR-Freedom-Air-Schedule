@@ -33,7 +33,7 @@ interface SlotKey {
   hour: number;
 }
 
-const HOURS = Array.from({ length: 15 }, (_, i) => i + 6); // 6 AM to 8 PM
+const HOURS = Array.from({ length: 24 }, (_, i) => i); // 12 AM to 11 PM (full day)
 
 export default function CalendarView({
   bookings,
@@ -92,7 +92,8 @@ export default function CalendarView({
 
   const formatHour = (hour: number) => {
     const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+    let displayHour = hour % 12;
+    if (displayHour === 0) displayHour = 12;
     return `${displayHour} ${ampm}`;
   };
 
