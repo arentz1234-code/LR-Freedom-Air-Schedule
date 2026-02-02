@@ -38,7 +38,7 @@ export default async function AdminPage() {
 
   const user = session.user as any;
 
-  if (user.role !== 'admin') {
+  if (user.role !== 'owner') {
     redirect('/');
   }
 

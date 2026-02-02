@@ -137,7 +137,7 @@ export default function AdminActions({ users, oilLogs, maintenance, maintenanceC
                   </td>
                   <td className="text-gray-500">{u.email}</td>
                   <td>
-                    <span className={`badge ${u.role === 'admin' ? 'badge-admin' : 'badge-renter'}`}>
+                    <span className={`badge ${u.role === 'owner' ? 'badge-admin' : 'badge-renter'}`}>
                       {u.role}
                     </span>
                   </td>

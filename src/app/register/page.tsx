@@ -10,7 +10,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<'owner' | 'renter'>('renter');
+  const [role, setRole] = useState<'owner' | 'leasor'>('leasor');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -119,9 +119,9 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">I am a:</label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
+            <label className="block text-sm font-medium mb-2">I am an:</label>
+            <div className="flex gap-6">
+              <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-lg hover:bg-gray-50 flex-1">
                 <input
                   type="radio"
                   name="role"
@@ -129,17 +129,23 @@ export default function RegisterPage() {
                   onChange={() => setRole('owner')}
                   className="w-4 h-4 text-sky-500"
                 />
-                <span>Owner</span>
+                <div>
+                  <span className="font-medium">Owner</span>
+                  <p className="text-xs text-gray-500">Full access to manage aircraft</p>
+                </div>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-lg hover:bg-gray-50 flex-1">
                 <input
                   type="radio"
                   name="role"
-                  checked={role === 'renter'}
-                  onChange={() => setRole('renter')}
+                  checked={role === 'leasor'}
+                  onChange={() => setRole('leasor')}
                   className="w-4 h-4 text-sky-500"
                 />
-                <span>Renter</span>
+                <div>
+                  <span className="font-medium">Leasor</span>
+                  <p className="text-xs text-gray-500">Book and fly the aircraft</p>
+                </div>
               </label>
             </div>
           </div>

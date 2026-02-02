@@ -26,8 +26,8 @@ export async function POST(request: Request) {
     }
 
     const user = session.user as any;
-    if (user.role !== 'admin') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    if (user.role !== 'owner') {
+      return NextResponse.json({ error: 'Owner access required' }, { status: 403 });
     }
 
     const { startTime, endTime, description } = await request.json();
@@ -82,8 +82,8 @@ export async function DELETE(request: Request) {
     }
 
     const user = session.user as any;
-    if (user.role !== 'admin') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    if (user.role !== 'owner') {
+      return NextResponse.json({ error: 'Owner access required' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);

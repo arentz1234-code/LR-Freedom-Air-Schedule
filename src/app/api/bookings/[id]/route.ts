@@ -31,8 +31,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
     }
 
-    // Check if user owns the booking or is admin
-    if (booking.user_id !== parseInt(user.id) && user.role !== 'admin') {
+    // Check if user owns the booking or is owner
+    if (booking.user_id !== parseInt(user.id) && user.role !== 'owner') {
       return NextResponse.json({ error: 'You can only cancel your own bookings' }, { status: 403 });
     }
 

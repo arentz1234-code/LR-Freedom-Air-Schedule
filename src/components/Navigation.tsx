@@ -11,7 +11,7 @@ interface NavigationProps {
 export default function Navigation({ session }: NavigationProps) {
   const pathname = usePathname();
   const user = session?.user as any;
-  const isAdmin = user?.role === 'admin';
+  const isOwner = user?.role === 'owner';
 
   return (
     <header className="bg-white border-b border-[var(--border-color)]">
@@ -51,7 +51,7 @@ export default function Navigation({ session }: NavigationProps) {
               >
                 Oil Log
               </Link>
-              {isAdmin && (
+              {isOwner && (
                 <Link
                   href="/admin"
                   className={`nav-link ${pathname === '/admin' ? 'active' : ''}`}

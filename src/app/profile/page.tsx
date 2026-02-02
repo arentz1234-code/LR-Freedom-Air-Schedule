@@ -51,7 +51,7 @@ export default async function ProfilePage() {
             <div>
               <p className="font-semibold text-lg">{dbUser.name}</p>
               <p className="text-gray-500">{dbUser.email}</p>
-              <span className={`badge mt-1 ${dbUser.role === 'admin' ? 'badge-admin' : 'badge-renter'}`}>
+              <span className={`badge mt-1 ${dbUser.role === 'owner' ? 'badge-admin' : 'badge-renter'}`}>
                 {dbUser.role}
               </span>
             </div>

@@ -85,7 +85,7 @@ export default async function CalendarPage() {
         bookings={bookings}
         maintenance={maintenance}
         currentUserId={parseInt(user.id)}
-        isAdmin={user.role === 'admin'}
+        isAdmin={user.role === 'owner'}
       />
     </div>
   );
