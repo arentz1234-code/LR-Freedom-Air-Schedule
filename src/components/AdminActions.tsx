@@ -78,7 +78,8 @@ export default function AdminActions({ users, oilLogs, currentUserId }: AdminAct
       {/* Users Section */}
       <div className="card">
         <div className="p-4 border-b border-gray-100">
-          <h2 className="font-semibold">Registered Users</h2>
+          <h2 className="font-semibold">Manage Renters</h2>
+          <p className="text-sm text-gray-500">Remove renters and their associated data</p>
         </div>
         <div className="overflow-x-auto">
           <table className="table">

@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { query } from '@/lib/db';
 import OilLogForm from '@/components/OilLogForm';
+import OilHistory from '@/components/OilHistory';
 
 interface OilLog {
   id: number;
@@ -112,38 +113,7 @@ export default async function OilPage() {
         <div className="p-4 border-b border-gray-100">
           <h2 className="font-semibold">Oil History</h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Quarts</th>
-                <th>Hobbs Time</th>
-                <th>Added By</th>
-                <th>Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {oilLogs.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="text-center text-gray-500 py-8">
-                    No oil entries yet
-                  </td>
-                </tr>
-              ) : (
-                oilLogs.map((log) => (
-                  <tr key={log.id}>
-                    <td>{new Date(log.date).toLocaleDateString()}</td>
-                    <td className="font-medium">{log.quarts}</td>
-                    <td className="font-mono">{log.hobbs_time}</td>
-                    <td>{log.user_name}</td>
-                    <td className="text-gray-500">{log.notes || '-'}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <OilHistory oilLogs={oilLogs} />
       </div>
     </div>
   );

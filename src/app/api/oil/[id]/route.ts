@@ -12,16 +12,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const user = session.user as any;
-    if (user.role !== 'admin') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-    }
-
     const id = parseInt(params.id);
     if (isNaN(id)) {
       return NextResponse.json({ error: 'Invalid oil log ID' }, { status: 400 });
     }
 
+    // Any logged-in user can delete oil entries
     await query('DELETE FROM oil_logs WHERE id = ?', [id]);
 
     return NextResponse.json({ success: true });
