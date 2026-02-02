@@ -36,9 +36,17 @@ export async function initDb() {
       start_time DATETIME NOT NULL,
       end_time DATETIME NOT NULL,
       notes TEXT,
+      destination TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Add destination column if it doesn't exist (for existing databases)
+  try {
+    await db.execute(`ALTER TABLE bookings ADD COLUMN destination TEXT`);
+  } catch {
+    // Column already exists
+  }
 
   // Maintenance table
   await db.execute(`

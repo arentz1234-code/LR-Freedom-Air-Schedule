@@ -22,6 +22,7 @@ export async function GET() {
       start_time: string;
       end_time: string;
       notes: string | null;
+      destination: string | null;
       user_name: string;
       user_color: string;
     }>(
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
     }
 
     const user = session.user as any;
-    const { startTime, endTime, notes } = await request.json();
+    const { startTime, endTime, notes, destination } = await request.json();
 
     if (!startTime || !endTime) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -79,8 +80,8 @@ export async function POST(request: Request) {
 
     // Create booking
     const result = await run(
-      'INSERT INTO bookings (user_id, start_time, end_time, notes) VALUES (?, ?, ?, ?)',
-      [user.id, start.toISOString(), end.toISOString(), notes || null]
+      'INSERT INTO bookings (user_id, start_time, end_time, notes, destination) VALUES (?, ?, ?, ?, ?)',
+      [user.id, start.toISOString(), end.toISOString(), notes || null, destination || null]
     );
 
     return NextResponse.json({
@@ -89,6 +90,7 @@ export async function POST(request: Request) {
       start_time: startTime,
       end_time: endTime,
       notes,
+      destination,
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating booking:', error);

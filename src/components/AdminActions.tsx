@@ -21,13 +21,22 @@ interface OilLog {
   user_name: string;
 }
 
+interface Maintenance {
+  id: number;
+  start_time: string;
+  end_time: string;
+  description: string;
+}
+
 interface AdminActionsProps {
   users: User[];
   oilLogs: OilLog[];
+  maintenance: Maintenance[];
+  maintenanceColor: string;
   currentUserId: number;
 }
 
-export default function AdminActions({ users, oilLogs, currentUserId }: AdminActionsProps) {
+export default function AdminActions({ users, oilLogs, maintenance, maintenanceColor, currentUserId }: AdminActionsProps) {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
 
@@ -65,6 +74,27 @@ export default function AdminActions({ users, oilLogs, currentUserId }: AdminAct
       } else {
         const data = await res.json();
         alert(data.error || 'Failed to delete oil log');
+      }
+    } catch {
+      alert('An error occurred');
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleDeleteMaintenance = async (maintenanceId: number) => {
+    if (!confirm('Are you sure you want to delete this maintenance entry?')) {
+      return;
+    }
+
+    setLoading(`maint-${maintenanceId}`);
+    try {
+      const res = await fetch(`/api/maintenance/${maintenanceId}`, { method: 'DELETE' });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to delete maintenance');
       }
     } catch {
       alert('An error occurred');
@@ -173,6 +203,57 @@ export default function AdminActions({ users, oilLogs, currentUserId }: AdminAct
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Maintenance Section */}
+      <div className="card lg:col-span-2">
+        <div className="p-4 border-b border-gray-100">
+          <h2 className="font-semibold">Scheduled Maintenance</h2>
+          <p className="text-sm text-gray-500">Delete scheduled maintenance entries</p>
+        </div>
+        <div className="p-4">
+          {maintenance.length === 0 ? (
+            <p className="text-gray-500 text-sm text-center py-4">
+              No maintenance scheduled
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {maintenance.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200"
+                >
+                  <div
+                    className="w-2 h-12 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: maintenanceColor }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{m.description}</p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(m.start_time).toLocaleDateString()} •{' '}
+                      {new Date(m.start_time).toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}{' '}
+                      -{' '}
+                      {new Date(m.end_time).toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteMaintenance(m.id)}
+                    disabled={loading === `maint-${m.id}`}
+                    className="bg-red-500 hover:bg-red-600 text-white text-sm font-medium px-3 py-1 rounded disabled:opacity-50 flex-shrink-0"
+                  >
+                    {loading === `maint-${m.id}` ? '...' : 'Delete'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

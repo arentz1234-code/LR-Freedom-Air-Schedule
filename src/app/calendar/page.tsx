@@ -15,6 +15,7 @@ interface Booking {
   start_time: string;
   end_time: string;
   notes: string | null;
+  destination: string | null;
   user_name: string;
   user_color: string;
 }

@@ -9,7 +9,7 @@ interface User {
 
 export async function POST(request: Request) {
   try {
-    const { name, email, password } = await request.json();
+    const { name, email, password, role: requestedRole } = await request.json();
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -29,8 +29,8 @@ export async function POST(request: Request) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Determine role (first user is admin)
-    const role = userCount === 0 ? 'admin' : 'renter';
+    // Determine role - owner becomes admin, renter stays renter
+    const role = requestedRole === 'owner' ? 'admin' : 'renter';
 
     // Create user
     const result = await run(

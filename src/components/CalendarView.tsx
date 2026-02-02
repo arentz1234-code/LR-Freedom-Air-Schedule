@@ -10,6 +10,7 @@ interface Booking {
   start_time: string;
   end_time: string;
   notes: string | null;
+  destination: string | null;
   user_name: string;
   user_color: string;
 }
@@ -45,6 +46,7 @@ export default function CalendarView({
   const [weekOffset, setWeekOffset] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [bookingNotes, setBookingNotes] = useState('');
+  const [bookingDestination, setBookingDestination] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
@@ -315,6 +317,7 @@ export default function CalendarView({
           startTime: startTime.toISOString(),
           endTime: endTime.toISOString(),
           notes: bookingNotes,
+          destination: bookingDestination,
         }),
       });
 
@@ -363,6 +366,7 @@ export default function CalendarView({
     setDragEnd(null);
     setSelectedBooking(null);
     setBookingNotes('');
+    setBookingDestination('');
   };
 
   return (
@@ -502,11 +506,16 @@ export default function CalendarView({
                           />
                           {/* Main booking content */}
                           <div
-                            className="flex-1 p-1"
+                            className="flex-1 p-1 overflow-hidden"
                             style={{ backgroundColor: b.user_color }}
                           >
                             {isStart && (
-                              <span className="font-medium">{b.user_name}</span>
+                              <div className="leading-tight">
+                                <span className="font-medium">{b.user_name}</span>
+                                {b.destination && (
+                                  <div className="text-[10px] opacity-90 truncate">{b.destination}</div>
+                                )}
+                              </div>
                             )}
                           </div>
                         </div>
@@ -568,6 +577,17 @@ export default function CalendarView({
 
                 <div className="space-y-4">
                   <div>
+                    <label className="block text-sm font-medium mb-2">Destination Airport</label>
+                    <input
+                      type="text"
+                      value={bookingDestination}
+                      onChange={(e) => setBookingDestination(e.target.value)}
+                      className="input"
+                      placeholder="e.g., KDFW, KAUS"
+                    />
+                  </div>
+
+                  <div>
                     <label className="block text-sm font-medium mb-2">Notes (optional)</label>
                     <input
                       type="text"
@@ -626,6 +646,11 @@ export default function CalendarView({
                         minute: '2-digit',
                       })}
                     </p>
+                    {selectedBooking.destination && (
+                      <p className="text-gray-600">
+                        <strong>Destination:</strong> {selectedBooking.destination}
+                      </p>
+                    )}
                     {selectedBooking.notes && (
                       <p className="text-gray-600">
                         <strong>Notes:</strong> {selectedBooking.notes}

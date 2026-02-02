@@ -10,6 +10,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [role, setRole] = useState<'owner' | 'renter'>('renter');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -33,7 +34,7 @@ export default function RegisterPage() {
       const res = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, role }),
       });
 
       if (res.ok) {
@@ -115,6 +116,32 @@ export default function RegisterPage() {
               placeholder="••••••••"
               required
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">I am a:</label>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="role"
+                  checked={role === 'owner'}
+                  onChange={() => setRole('owner')}
+                  className="w-4 h-4 text-sky-500"
+                />
+                <span>Owner</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="role"
+                  checked={role === 'renter'}
+                  onChange={() => setRole('renter')}
+                  className="w-4 h-4 text-sky-500"
+                />
+                <span>Renter</span>
+              </label>
+            </div>
           </div>
 
           <button
